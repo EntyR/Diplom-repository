@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, createContext, useContext } from "react"
 
 const FolderContext = createContext({ fileMap: {}, folderName: null });
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://91.209.135.149:8000";
 
 const TABS = [
   { id: "identify", label: "Идентификация", icon: "ti-scan" },
