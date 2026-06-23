@@ -10,7 +10,7 @@ const TABS = [
   { id: "gallery", label: "Галерея", icon: "ti-users" },
 ];
 
-function Avatar({ personId, size = 48 }) {
+function Avatar({ subjectId, size = 48 }) {
   const colors = [
     ["#E6F1FB", "#0C447C"],
     ["#E1F5EE", "#085041"],
@@ -19,9 +19,9 @@ function Avatar({ personId, size = 48 }) {
     ["#FAECE7", "#712B13"],
     ["#EAF3DE", "#27500A"],
   ];
-  const idx = personId ? personId.charCodeAt(0) % colors.length : 0;
+  const idx = subjectId ? subjectId.charCodeAt(0) % colors.length : 0;
   const [bg, fg] = colors[idx];
-  const letters = personId ? personId.slice(0, 2).toUpperCase() : "??";
+  const letters = subjectId ? subjectId.slice(0, 2).toUpperCase() : "??";
   return (
     <div
       style={{
@@ -119,14 +119,14 @@ function ScoreBadge({ score }) {
   );
 }
 
-function ActionBadge({ action }) {
+function ActionBadge({ status }) {
   const map = {
-    matched:          { label: "Найден",        bg: "#EAF3DE", color: "#27500A" },
-    inserted:         { label: "Создан",         bg: "#E6F1FB", color: "#0C447C" },
-    not_found:        { label: "Не найден",      bg: "#FAEEDA", color: "#633806" },
-    no_face_detected: { label: "Лицо не найдено", bg: "#FCEBEB", color: "#791F1F" },
+    matched:          { label: "Найден",         bg: "#EAF3DE", color: "#27500A" },
+    enrolled:         { label: "Создан",          bg: "#E6F1FB", color: "#0C447C" },
+    not_found:        { label: "Не найден",       bg: "#FAEEDA", color: "#633806" },
+    no_face:          { label: "Лицо не найдено", bg: "#FCEBEB", color: "#791F1F" },
   };
-  const { label, bg, color } = map[action] || { label: action, bg: "#F1EFE8", color: "#444441" };
+  const { label, bg, color } = map[status] || { label: status, bg: "#F1EFE8", color: "#444441" };
   return (
     <span style={{ background: bg, color, fontSize: 12, fontWeight: 500, padding: "3px 12px", borderRadius: 20 }}>
       {label}
@@ -180,8 +180,8 @@ function DropZone({ onFile, preview, label = "Перетащите фото сю
   );
 }
 
-function PersonCard({ person, showSources = false }) {
-  if (!person) return null;
+function SubjectCard({ subject, showOrigins = false }) {
+  if (!subject) return null;
   return (
     <div style={{
       background: "var(--color-background-primary)",
@@ -192,17 +192,17 @@ function PersonCard({ person, showSources = false }) {
       alignItems: "flex-start",
       gap: 14,
     }}>
-      <Avatar personId={person.person_id} size={48} />
+      <Avatar subjectId={subject.subject_id} size={48} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <p style={{ fontWeight: 500, fontSize: 14, margin: "0 0 2px", color: "var(--color-text-primary)", wordBreak: "break-all" }}>
-          {person.person_id || "Без ID"}
+          {subject.subject_id || "Без ID"}
         </p>
         <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>
-          {person.sources?.length || 0} фото в базе
+          {subject.origins?.length || 0} фото в базе
         </p>
-        {showSources && person.sources?.length > 0 && (
+        {showOrigins && subject.origins?.length > 0 && (
           <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {person.sources.map((src, i) => (
+            {subject.origins.map((src, i) => (
               <span key={i} style={{
                 fontSize: 11, background: "var(--color-background-secondary)",
                 color: "var(--color-text-secondary)", padding: "2px 8px",
@@ -246,7 +246,7 @@ function IdentifyTab() {
     try {
       const fd = new FormData();
       fd.append("image", file);
-      const res = await fetch(`${API_BASE}/lookup_or_insert?allow_insert=false&threshold=${threshold}`, {
+      const res = await fetch(`${API_BASE}/verify?allow_enroll=false&cutoff=${threshold}`, {
         method: "POST", body: fd,
       });
       if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
@@ -266,7 +266,7 @@ function IdentifyTab() {
     try {
       const fd = new FormData();
       fd.append("image", file);
-      const res = await fetch(`${API_BASE}/person/`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/subjects`, { method: "POST", body: fd });
       if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
       setCreateResult(await res.json());
     } catch (e) {
@@ -322,13 +322,13 @@ function IdentifyTab() {
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-text-primary)" }}>Результат:</span>
-            <ActionBadge action={result.action} />
-            {result.score != null && <ScoreBadge score={result.score} />}
+            <ActionBadge status={result.status} />
+            {result.similarity != null && <ScoreBadge score={result.similarity} />}
           </div>
 
-          {result.action === "matched" && result.person && (
+          {result.status === "matched" && result.subject && (
             <>
-              <PersonCard person={result.person} showSources />
+              <SubjectCard subject={result.subject} showOrigins />
               <div style={{ display: "flex", gap: 10 }}>
                 <button onClick={reset} style={{ flex: 1, padding: "9px 0" }}>
                   <i className="ti ti-arrow-left" style={{ fontSize: 15, marginRight: 6 }} aria-hidden="true" />
@@ -338,9 +338,9 @@ function IdentifyTab() {
             </>
           )}
 
-          {(result.action === "not_found" || result.action === "no_face_detected") && (
+          {(result.status === "not_found" || result.status === "no_face") && (
             <div style={{ background: "var(--color-background-secondary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-lg)", padding: "1.25rem" }}>
-              {result.action === "no_face_detected" ? (
+              {result.status === "no_face" ? (
                 <p style={{ margin: 0, fontSize: 14, color: "var(--color-text-secondary)" }}>
                   <i className="ti ti-face-id-error" style={{ fontSize: 18, marginRight: 8, verticalAlign: -3 }} aria-hidden="true" />
                   Лицо не обнаружено на фотографии. Попробуйте другое изображение.
@@ -374,7 +374,7 @@ function IdentifyTab() {
             <i className="ti ti-circle-check" style={{ fontSize: 18 }} aria-hidden="true" />
             Пользователь успешно создан!
           </div>
-          <PersonCard person={createResult} showSources />
+          <SubjectCard subject={createResult} showOrigins />
           <button onClick={reset} style={{ padding: "9px 0" }}>
             <i className="ti ti-arrow-left" style={{ fontSize: 15, marginRight: 6 }} aria-hidden="true" />
             Новый поиск
@@ -405,7 +405,7 @@ function RegisterTab() {
     try {
       const fd = new FormData();
       fd.append("image", file);
-      const res = await fetch(`${API_BASE}/person/`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/subjects`, { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Ошибка ${res.status}`);
@@ -458,7 +458,7 @@ function RegisterTab() {
 
           <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-lg)", padding: "1.25rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
-              <Avatar personId={result.person_id} size={56} />
+              <Avatar subjectId={result.subject_id} size={56} />
               <div>
                 <p style={{ fontWeight: 500, margin: "0 0 2px", fontSize: 15, color: "var(--color-text-primary)" }}>Новый пользователь</p>
                 <p style={{ fontSize: 12, color: "var(--color-text-secondary)", margin: 0 }}>Профиль создан</p>
@@ -467,13 +467,13 @@ function RegisterTab() {
             <div style={{ borderTop: "0.5px solid var(--color-border-tertiary)", paddingTop: 12 }}>
               <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 4 }}>ID пользователя</div>
               <code style={{ fontSize: 12, background: "var(--color-background-secondary)", padding: "4px 8px", borderRadius: 6, wordBreak: "break-all", display: "block", color: "var(--color-text-primary)" }}>
-                {result.person_id}
+                {result.subject_id}
               </code>
             </div>
-            {result.sources?.length > 0 && (
+            {result.origins?.length > 0 && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 6 }}>Фотографии</div>
-                {result.sources.map((src, i) => (
+                {result.origins.map((src, i) => (
                   <div key={i} style={{ fontSize: 12, color: "var(--color-text-secondary)", padding: "3px 0", display: "flex", alignItems: "center", gap: 6 }}>
                     <i className="ti ti-photo" style={{ fontSize: 14 }} aria-hidden="true" />
                     <span style={{ wordBreak: "break-all" }}>{src}</span>
@@ -494,7 +494,7 @@ function RegisterTab() {
   );
 }
 
-function AddFaceModal({ person, onClose, onSuccess }) {
+function AddFaceModal({ subject, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -510,7 +510,7 @@ function AddFaceModal({ person, onClose, onSuccess }) {
     try {
       const fd = new FormData();
       fd.append("image", file);
-      const res = await fetch(`${API_BASE}/person/${person.person_id}/add_face`, { method: "POST", body: fd });
+      const res = await fetch(`${API_BASE}/subjects/${subject.subject_id}/portraits`, { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Ошибка ${res.status}`);
@@ -534,7 +534,7 @@ function AddFaceModal({ person, onClose, onSuccess }) {
           </button>
         </div>
         <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 14px" }}>
-          Пользователь: <code style={{ fontSize: 11, background: "var(--color-background-secondary)", padding: "2px 6px", borderRadius: 4 }}>{person.person_id?.slice(0, 16)}...</code>
+          Пользователь: <code style={{ fontSize: 11, background: "var(--color-background-secondary)", padding: "2px 6px", borderRadius: 4 }}>{subject.subject_id?.slice(0, 16)}...</code>
         </p>
         <DropZone onFile={handleFile} preview={preview} label="Фото для добавления" />
         {error && (
@@ -557,24 +557,24 @@ function AddFaceModal({ person, onClose, onSuccess }) {
 }
 
 function GalleryTab() {
-  const [personId, setPersonId] = useState("");
-  const [person, setPerson] = useState(null);
+  const [subjectId, setSubjectId] = useState("");
+  const [subject, setSubject] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [addModal, setAddModal] = useState(false);
-  const [removingSource, setRemovingSource] = useState(null);
+  const [removingOrigin, setRemovingOrigin] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  const fetchPerson = async (id) => {
+  const fetchSubject = async (id) => {
     if (!id.trim()) return;
-    setLoading(true); setError(null); setPerson(null); setSuccessMsg(null);
+    setLoading(true); setError(null); setSubject(null); setSuccessMsg(null);
     try {
-      const res = await fetch(`${API_BASE}/identity/${id.trim()}`);
+      const res = await fetch(`${API_BASE}/subjects/${id.trim()}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: res.statusText }));
         throw new Error(err.detail || `Ошибка ${res.status}`);
       }
-      setPerson(await res.json());
+      setSubject(await res.json());
     } catch (e) {
       setError(e.message);
     } finally {
@@ -582,13 +582,13 @@ function GalleryTab() {
     }
   };
 
-  const removeFace = async (source) => {
-    setRemovingSource(source); setError(null);
+  const removePortrait = async (origin) => {
+    setRemovingOrigin(origin); setError(null);
     try {
-      const params = new URLSearchParams({ source });
-      const res = await fetch(`${API_BASE}/person/${person.person_id}/remove_face?${params}`, { method: "POST" });
+      const params = new URLSearchParams({ origin });
+      const res = await fetch(`${API_BASE}/subjects/${subject.subject_id}/portraits?${params}`, { method: "DELETE" });
       if (res.status === 204) {
-        setPerson(null);
+        setSubject(null);
         setSuccessMsg("Пользователь удалён — у него была только одна фотография.");
         return;
       }
@@ -597,18 +597,18 @@ function GalleryTab() {
         throw new Error(err.detail || `Ошибка ${res.status}`);
       }
       const updated = await res.json();
-      setPerson(updated);
+      setSubject(updated);
       setSuccessMsg("Фотография удалена.");
     } catch (e) {
       setError(e.message);
     } finally {
-      setRemovingSource(null);
+      setRemovingOrigin(null);
     }
   };
 
   const handleAddSuccess = (updated) => {
     setAddModal(false);
-    setPerson(updated);
+    setSubject(updated);
     setSuccessMsg("Фотография добавлена!");
   };
 
@@ -619,13 +619,13 @@ function GalleryTab() {
         <div style={{ display: "flex", gap: 10 }}>
           <input
             type="text"
-            placeholder="Введите person_id..."
-            value={personId}
-            onChange={(e) => setPersonId(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && fetchPerson(personId)}
+            placeholder="Введите subject_id..."
+            value={subjectId}
+            onChange={(e) => setSubjectId(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && fetchSubject(subjectId)}
             style={{ flex: 1, fontSize: 13 }}
           />
-          <button onClick={() => fetchPerson(personId)} disabled={loading || !personId.trim()} style={{ padding: "9px 20px", display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => fetchSubject(subjectId)} disabled={loading || !subjectId.trim()} style={{ padding: "9px 20px", display: "flex", alignItems: "center", gap: 8 }}>
             {loading
               ? <i className="ti ti-loader-2" style={{ fontSize: 15, animation: "spin 1s linear infinite" }} aria-hidden="true" />
               : <i className="ti ti-search" style={{ fontSize: 15 }} aria-hidden="true" />}
@@ -648,14 +648,14 @@ function GalleryTab() {
         </div>
       )}
 
-      {person && (
+      {subject && (
         <div style={{ background: "var(--color-background-primary)", border: "0.5px solid var(--color-border-tertiary)", borderRadius: "var(--border-radius-lg)", overflow: "hidden" }}>
           <div style={{ padding: "1rem 1.25rem", borderBottom: "0.5px solid var(--color-border-tertiary)", display: "flex", alignItems: "center", gap: 14 }}>
-            <Avatar personId={person.person_id} size={52} />
+            <Avatar subjectId={subject.subject_id} size={52} />
             <div style={{ flex: 1 }}>
               <p style={{ fontWeight: 500, fontSize: 15, margin: "0 0 2px", color: "var(--color-text-primary)" }}>Профиль пользователя</p>
               <code style={{ fontSize: 11, color: "var(--color-text-secondary)", background: "var(--color-background-secondary)", padding: "2px 6px", borderRadius: 4, wordBreak: "break-all" }}>
-                {person.person_id}
+                {subject.subject_id}
               </code>
             </div>
             <button onClick={() => setAddModal(true)} style={{ padding: "8px 14px", display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
@@ -666,11 +666,11 @@ function GalleryTab() {
 
           <div style={{ padding: "1rem 1.25rem" }}>
             <p style={{ fontSize: 13, color: "var(--color-text-secondary)", margin: "0 0 12px", fontWeight: 500 }}>
-              Фотографии ({person.sources?.length || 0})
+              Фотографии ({subject.origins?.length || 0})
             </p>
-            {person.sources?.length > 0 ? (
+            {subject.origins?.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {person.sources.map((src, i) => (
+                {subject.origins.map((src, i) => (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: 10,
                     background: "var(--color-background-secondary)",
@@ -681,11 +681,11 @@ function GalleryTab() {
                     <SourceImage source={src} />
                     <span style={{ flex: 1, fontSize: 13, color: "var(--color-text-primary)", wordBreak: "break-all" }}>{src}</span>
                     <button
-                      onClick={() => removeFace(src)}
-                      disabled={removingSource === src}
+                      onClick={() => removePortrait(src)}
+                      disabled={removingOrigin === src}
                       style={{ padding: "6px 10px", color: "#791F1F", borderColor: "#F09595", background: "transparent", fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}
                     >
-                      {removingSource === src
+                      {removingOrigin === src
                         ? <i className="ti ti-loader-2" style={{ fontSize: 14, animation: "spin 1s linear infinite" }} aria-hidden="true" />
                         : <i className="ti ti-trash" style={{ fontSize: 14 }} aria-hidden="true" />}
                     </button>
@@ -699,8 +699,8 @@ function GalleryTab() {
         </div>
       )}
 
-      {addModal && person && (
-        <AddFaceModal person={person} onClose={() => setAddModal(false)} onSuccess={handleAddSuccess} />
+      {addModal && subject && (
+        <AddFaceModal subject={subject} onClose={() => setAddModal(false)} onSuccess={handleAddSuccess} />
       )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
